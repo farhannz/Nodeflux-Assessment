@@ -37,6 +37,8 @@ int main()
     std::string url = "https://data.covid19.go.id/public/api/update.json";
     
     
+    // General Cumulative Covid19 Cases in Indonesia
+
     CROW_ROUTE(app, "/")
     ([url]{
       std::string readBuffer;
@@ -59,8 +61,8 @@ int main()
       return resData;
     });
 
-
-    CROW_ROUTE(app, "/yearly/<int>")
+    // Cumulative Covid19 Cases for each year in Indonesia
+    CROW_ROUTE(app, "/yearly/<int>") // example : /yearly/2020 (Year 2020)
     ([url](int year){
       std::string readBuffer;
       fetchData(readBuffer, url);
@@ -71,24 +73,102 @@ int main()
         {"deaths", 0},
         {"active", 0}
         };
-      
+      int totalDataFound = 0;
       for(auto a : j["update"]["harian"]){
-        time_t timeInSeconds = (time_t)a["key"]/(time_t)1000;
-        struct tm *tm = gmtime(&timeInSeconds); 
+        time_t timeInSeconds = (time_t)a["key"]/(time_t)1000; // Convert ms to seconds
+        struct tm *tm = localtime(&timeInSeconds); 
         int dataYear = tm->tm_year + 1900; // tm_year = The numbers years since 1900
-        long tmp = 0;
-        if(dataYear > year) break;
         if(year == dataYear){
           data["positive"] = (long)data["positive"] + (long)a["jumlah_positif"]["value"];
           data["recovered"] = (long)data["recovered"] + (long)a["jumlah_sembuh"]["value"];
           data["deaths"] = (long)data["deaths"] + (long)a["jumlah_meninggal"]["value"];
           data["active"] = (long)data["active"] + (long)a["jumlah_dirawat"]["value"];
+          totalDataFound++;
         }
       }
       crow::json::wvalue resData;
-      resData["ok"] = "true";
+      resData["ok"] = true;
       resData["data"] = crow::json::load(data.dump());
       resData["message"] = "Success";
+      if(!totalDataFound){
+        resData["ok"] = false;
+        resData["message"] = "Data not found!";
+      }
+      return resData;
+    });
+
+    
+    CROW_ROUTE(app, "/monthly/<int>/<int>") // example : /monthly/2022/02 (Feb 2022)
+    ([url](int year, int month){
+      std::string readBuffer;
+      fetchData(readBuffer, url);
+      json j = json::parse(readBuffer.c_str());
+      json data = {
+        {"positive", 0},
+        {"recovered", 0}, 
+        {"deaths", 0},
+        {"active", 0}
+        };
+      int totalDataFound = 0;
+      for(auto a : j["update"]["harian"]){
+        time_t timeInSeconds = (time_t)a["key"]/(time_t)1000; // Convert ms to seconds
+        struct tm *tm = localtime(&timeInSeconds); 
+        int dataYear = tm->tm_year + 1900; // tm_year = The number of years since 1900
+        int dataMonth = tm->tm_mon + 1;  // tm_year = The number of months since Jan 
+        if(year == dataYear && month == dataMonth){
+          data["positive"] = (long)data["positive"] + (long)a["jumlah_positif"]["value"];
+          data["recovered"] = (long)data["recovered"] + (long)a["jumlah_sembuh"]["value"];
+          data["deaths"] = (long)data["deaths"] + (long)a["jumlah_meninggal"]["value"];
+          data["active"] = (long)data["active"] + (long)a["jumlah_dirawat"]["value"];
+          totalDataFound++;
+        }
+      }
+      crow::json::wvalue resData;
+      resData["ok"] = true;
+      resData["data"] = crow::json::load(data.dump());
+      resData["message"] = "Success";
+      if(!totalDataFound){
+        resData["ok"] = false;
+        resData["message"] = "Data not found!";
+      }
+      return resData;
+    });
+
+
+    CROW_ROUTE(app, "/daily/<int>/<int>/<int>") // example : /daily/2022/02/03 (03 Feb 2022)
+    ([url](int year, int month, int day){
+      std::string readBuffer;
+      fetchData(readBuffer, url);
+      json j = json::parse(readBuffer.c_str());
+      json data = {
+        {"positive", 0},
+        {"recovered", 0}, 
+        {"deaths", 0},
+        {"active", 0}
+        };
+      int totalDataFound = 0;
+      for(auto a : j["update"]["harian"]){
+        time_t timeInSeconds = (time_t)a["key"]/(time_t)1000; // Convert ms to seconds
+        struct tm *tm = localtime(&timeInSeconds); 
+        int dataYear = tm->tm_year + 1900; // tm_year = The number of years since 1900
+        int dataMonth = tm->tm_mon + 1;  // tm_year = The number of months since Jan 
+        int dataDay = tm->tm_mday;  // tm_mday = The day of the month 
+        if(year == dataYear && month == dataMonth && day == dataDay){
+          data["positive"] = (long)data["positive"] + (long)a["jumlah_positif"]["value"];
+          data["recovered"] = (long)data["recovered"] + (long)a["jumlah_sembuh"]["value"];
+          data["deaths"] = (long)data["deaths"] + (long)a["jumlah_meninggal"]["value"];
+          data["active"] = (long)data["active"] + (long)a["jumlah_dirawat"]["value"];
+          totalDataFound++;
+        }
+      }
+      crow::json::wvalue resData;
+      resData["ok"] = true;
+      resData["data"] = crow::json::load(data.dump());
+      resData["message"] = "Success";
+      if(!totalDataFound){
+        resData["ok"] = false;
+        resData["message"] = "Data not found!";
+      }
       return resData;
     });
 
