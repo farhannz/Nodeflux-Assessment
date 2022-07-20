@@ -1,0 +1,97 @@
+#include "crow_all.h"
+#include <curl/curl.h>
+#include "json.hpp"
+#include <time.h>
+#include <chrono>
+using json = nlohmann::json;
+
+
+static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
+{
+    ((std::string*)userp)->append((char*)contents, size * nmemb);
+    return size * nmemb;
+}
+
+
+void fetchData(std::string &readBuffer, std::string url){
+    CURL* curl = curl_easy_init();
+    CURLcode res;
+    curl = curl_easy_init();
+    if(curl) {
+      curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+      curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+  
+      res = curl_easy_perform(curl);
+      if(res != CURLE_OK)
+        fprintf(stderr, "curl_easy_perform() failed: %s\n",
+                curl_easy_strerror(res));
+
+      curl_easy_cleanup(curl);
+    }
+}
+
+int main()
+{
+    crow::SimpleApp app;
+    std::string url = "https://data.covid19.go.id/public/api/update.json";
+    
+    
+    CROW_ROUTE(app, "/")
+    ([url]{
+      std::string readBuffer;
+      fetchData(readBuffer, url);
+      json j = json::parse(readBuffer.c_str());
+      json data = {
+        {"total_positive", j["update"]["total"]["jumlah_positif"]},
+        {"total_recovered", j["update"]["total"]["jumlah_sembuh"]}, 
+        {"total_deaths", j["update"]["total"]["jumlah_meninggal"]},
+        {"total_active", j["update"]["total"]["jumlah_dirawat"]},
+        {"new_positive", j["update"]["penambahan"]["jumlah_positif"]},
+        {"new_recovered", j["update"]["penambahan"]["jumlah_sembuh"]}, 
+        {"new_deaths", j["update"]["penambahan"]["jumlah_meninggal"]},
+        {"new_active", j["update"]["penambahan"]["jumlah_dirawat"]}
+        };
+      crow::json::wvalue resData;
+      resData["ok"] = "true";
+      resData["data"] = crow::json::load(data.dump());
+      resData["message"] = "Success";
+      return resData;
+    });
+
+
+    CROW_ROUTE(app, "/yearly/<int>")
+    ([url](int year){
+      std::string readBuffer;
+      fetchData(readBuffer, url);
+      json j = json::parse(readBuffer.c_str());
+      json data = {
+        {"positive", 0},
+        {"recovered", 0}, 
+        {"deaths", 0},
+        {"active", 0}
+        };
+      
+      for(auto a : j["update"]["harian"]){
+        time_t timeInSeconds = (time_t)a["key"]/(time_t)1000;
+        struct tm *tm = gmtime(&timeInSeconds); 
+        int dataYear = tm->tm_year + 1900; // tm_year = The numbers years since 1900
+        long tmp = 0;
+        if(dataYear > year) break;
+        if(year == dataYear){
+          data["positive"] = (long)data["positive"] + (long)a["jumlah_positif"]["value"];
+          data["recovered"] = (long)data["recovered"] + (long)a["jumlah_sembuh"]["value"];
+          data["deaths"] = (long)data["deaths"] + (long)a["jumlah_meninggal"]["value"];
+          data["active"] = (long)data["active"] + (long)a["jumlah_dirawat"]["value"];
+        }
+      }
+      crow::json::wvalue resData;
+      resData["ok"] = "true";
+      resData["data"] = crow::json::load(data.dump());
+      resData["message"] = "Success";
+      return resData;
+    });
+
+    app.port(3000).multithreaded().run();
+
+}
