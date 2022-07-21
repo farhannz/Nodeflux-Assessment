@@ -1,6 +1,8 @@
 # Nodeflux-Assessment
- C++ Software Engineer Nodeflux Assessment   
-   
+ C++ Software Engineer Nodeflux Assessment    
+ 
+[![CI Build](https://github.com/farhannz/Nodeflux-Assessment/actions/workflows/docker-image.yml/badge.svg)](https://github.com/farhannz/Nodeflux-Assessment/actions/workflows/docker-image.yml)
+  
    
    
    
